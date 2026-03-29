@@ -1,34 +1,24 @@
 services:
-  db:
-    image: postgres:15
-    container_name: smart_agent_db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+  falkordb:
+    image: falkordb/falkordb-server:latest
+    container_name: falkordb-server
     ports:
-      - "5432:5432"
+      - "6379:6379"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - falkordb_data:/data
+      - ./falkordb.conf:/etc/falkordb/falkordb.conf:ro
+    environment:
+      - REDIS_ARGS=/etc/falkordb/falkordb.conf
+    restart: unless-stopped
 
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: smart_agent_migrate
-    env_file:
-      - .env
+  falkordb-browser:
+    image: falkordb/falkordb-browser:latest
+    container_name: falkordb-browser
+    ports:
+      - "3000:3000"   
     depends_on:
-      db:
-        condition: service_healthy
-    command: >
-      python -c "from app.database.connection import init_connection_pool; init_connection_pool()"
-    restart: "no"
+      - falkordb
+    restart: unless-stopped
 
   app:
     build:
@@ -36,14 +26,13 @@ services:
       dockerfile: Dockerfile
     container_name: smart_agent_dev
     ports:
-      - "3000:3000"
+      - "8080:8080"
     env_file:
       - .env
     volumes:
       - ./:/app
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      - falkordb
 
 volumes:
-  postgres_data:
+  falkordb_data:

@@ -51,3 +51,4 @@ flasgger
 pypdf
 openai
 python-dotenv
+graphiti-core
