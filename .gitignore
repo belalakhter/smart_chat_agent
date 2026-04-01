@@ -150,6 +150,3 @@ __marimo__/
 
 # Gunicorn
 gunicorn.ctl
-
-# FalkorDB local config
-falkordb.conf

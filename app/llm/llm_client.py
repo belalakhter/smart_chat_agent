@@ -9,7 +9,7 @@ _client = OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY", ""),
 )
 
-LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o")
 
 
 def chat_completion(

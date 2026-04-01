@@ -11,7 +11,9 @@ from app.database.document_store import (
     set_document_status,
 )
 
-logger = logging.getLogger(__name__)
+from app.services.logger import get_logger
+
+logger = get_logger(__name__)
 
 documents_bp = Blueprint("documents", __name__)
 
@@ -67,35 +69,27 @@ def upload_document():
     filename = f.filename
 
     doc_id = uuid.uuid4().hex
-    doc_status = "pending"
 
     try:
-        create_document(doc_id, filename, raw, status=doc_status)
+        create_document(doc_id, filename, raw, status="pending")
     except Exception as e:
         logger.error(f"[upload] FalkorDB error saving document: {e}")
         return jsonify({"error": str(e)}), 500
 
     try:
-        from app.services.worker_threads import submit_task
-        from app.rag.rag_processing import ingest_document
+        from app.services.worker_threads import submit_async
+        from app.rag.rag_processing import _ingest_async
 
-        submit_task(ingest_document, doc_id, raw, filename)
-        logger.info(f"[upload] Ingestion task submitted for doc {doc_id} ({filename})")
+        submit_async(_ingest_async(doc_id, raw, filename))
+        logger.info(f"[upload] Ingestion queued for doc {doc_id} ({filename})")
     except Exception as e:
-        logger.error(f"[upload] Failed to submit ingestion task for {doc_id}: {e}")
+        logger.error(f"[upload] Failed to queue ingestion for {doc_id}: {e}")
         _mark_failed(doc_id)
 
-    return jsonify(
-        {
-            "id": doc_id,
-            "filename": filename,
-            "status": doc_status,
-        }
-    ), 201
+    return jsonify({"id": doc_id, "filename": filename, "status": "pending"}), 201
 
 
 def _mark_failed(doc_id: str):
-    """Fallback: mark document as failed if task submission itself errors."""
     try:
         set_document_status(doc_id, "failed")
     except Exception as e:
@@ -201,6 +195,13 @@ def delete_document_route(doc_id):
     try:
         if not delete_document(doc_id):
             return jsonify({"error": "Document not found"}), 404
+        
+        try:
+            from app.rag.rag_processing import delete_document_data
+            delete_document_data(doc_id)
+        except Exception as e:
+            logger.warning(f"[documents] Failed to queue RAG cleanup for {doc_id}: {e}")
+
         return jsonify({"deleted": doc_id}), 200
     except Exception as e:
         logger.error(f"[documents] delete failed: {e}")

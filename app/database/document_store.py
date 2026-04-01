@@ -1,6 +1,3 @@
-"""
-Document metadata and file bytes stored in FalkorDB via the Redis protocol.
-"""
 from __future__ import annotations
 
 from typing import Any, Optional, TypedDict

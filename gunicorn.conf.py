@@ -1,6 +1,6 @@
-import logging
+from app.services.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def post_fork(server, worker):
@@ -14,7 +14,7 @@ def post_fork(server, worker):
     init_connection_pool(minconn=1, maxconn=5, force=True)
 
     logger.info(f"[worker {worker.pid}] Reinitializing async worker after fork...")
-    init_worker(max_workers=10)
+    init_worker(max_workers=10, force=True)
 
 
 def worker_exit(server, worker):

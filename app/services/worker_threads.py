@@ -5,7 +5,7 @@ from typing import Callable, Coroutine, Any, Optional
 
 from app.services.logger import get_logger
 
-logger = get_logger(__name__, level="DEBUG")
+logger = get_logger(__name__, level="INFO")
 
 
 class AsyncWorker:
@@ -48,6 +48,16 @@ class AsyncWorker:
 
         future: Future = asyncio.run_coroutine_threadsafe(coro, self._loop)
 
+        def _on_done(f: Future) -> None:
+            exc = f.exception()
+            if exc is not None:
+                logger.error(
+                    f"[worker] Unhandled exception in background coroutine: {exc}",
+                    exc_info=exc,
+                )
+
+        future.add_done_callback(_on_done)
+
         if wait:
             return future.result(timeout=timeout)
 
@@ -62,8 +72,13 @@ class AsyncWorker:
 _worker: Optional[AsyncWorker] = None
 
 
-def init_worker(max_workers: int = 5) -> None:
+def init_worker(max_workers: int = 5, force: bool = False) -> None:
     global _worker
+    if force and _worker:
+        logger.info("Forcing re-initialization of async worker")
+        _worker.shutdown()
+        _worker = None
+
     if _worker is None:
         _worker = AsyncWorker(max_workers=max_workers)
         _worker.start()
@@ -85,12 +100,13 @@ def shutdown_worker() -> None:
         _worker.shutdown()
         _worker = None
 
+
 def submit_task(func: Callable, *args: Any, **kwargs: Any) -> None:
     """
     Submit a synchronous function to the background executor.
     """
     if _worker is None:
         raise RuntimeError("Worker not initialized. Call init_worker().")
-    
+
     logger.info(f"Submitting background task: {func.__name__}")
     _worker._executor.submit(func, *args, **kwargs)
